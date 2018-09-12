@@ -51,7 +51,7 @@ public class QuartzConfiguration {
 		stFactory.setStartDelay(3000);
 		stFactory.setName("cron_trigger");
 		stFactory.setGroup("cron_group");
-		stFactory.setCronExpression("0 0/2 * 1/1 * ? *");
+		stFactory.setCronExpression("0 0/1 * 1/1 * ? *");
 		return stFactory;
 	}
 

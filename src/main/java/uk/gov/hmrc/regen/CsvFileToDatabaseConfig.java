@@ -1,5 +1,7 @@
 package uk.gov.hmrc.regen;
 
+import java.net.MalformedURLException;
+
 import javax.sql.DataSource;
 
 import org.slf4j.Logger;
@@ -20,12 +22,14 @@ import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.UrlResource;
 
 @EnableBatchProcessing
 @Configuration
 public class CsvFileToDatabaseConfig {
     private static final Logger log = LoggerFactory.getLogger(CsvFileToDatabaseConfig.class);
+    
+    private static final String INPUT_FILE = "file:///home/regen/temp/fileinput/files/inputFile.csv";
 
 	@Autowired
 	public JobBuilderFactory jobBuilderFactory;
@@ -37,10 +41,11 @@ public class CsvFileToDatabaseConfig {
 	public DataSource dataSource;
 
 	@Bean
-	public FlatFileItemReader<FileContentDTO> csvFileReader() {
+	public FlatFileItemReader<FileContentDTO> csvFileReader(String file) throws MalformedURLException {
 		log.info("Entering csvFileReader");
 		FlatFileItemReader<FileContentDTO> reader = new FlatFileItemReader<FileContentDTO>();
-		reader.setResource(new ClassPathResource("inputFile.csv"));
+		reader.setStrict(false);  // Don't fail if file not there
+		reader.setResource(new UrlResource(file));
 		reader.setLineMapper(new DefaultLineMapper<FileContentDTO>() {
 			{
 				setLineTokenizer(new DelimitedLineTokenizer() {
@@ -88,14 +93,15 @@ public class CsvFileToDatabaseConfig {
 
 	// begin job info
 	@Bean
-	public Step csvFileToDatabaseStep() {
+	public Step csvFileToDatabaseStep() throws Exception {
 		log.info("Entering csvFileToDatabaseStep");
-		return stepBuilderFactory.get("csvFileToDatabaseStep").<FileContentDTO, FileContentDTO> chunk(5)
-				.reader(csvFileReader()).processor(csvFileProcessor()).writer(toDBWriter()).build();
+		
+		return stepBuilderFactory.get("csvFileToDatabaseStep").allowStartIfComplete(true). <FileContentDTO, FileContentDTO> chunk(5)
+				.reader(csvFileReader(INPUT_FILE)).processor(csvFileProcessor()).writer(toDBWriter()).build();
 	}
 
 	@Bean
-	Job csvFileToDatabaseJob(JobCompletionNotificationListener listener) {
+	Job csvFileToDatabaseJob(JobCompletionNotificationListener listener) throws Exception  {
 		log.info("Entering csvFileToDatabaseJob");
 		return jobBuilderFactory.get("csvFileToDatabaseJob").incrementer(new RunIdIncrementer()).listener(listener)
 				.flow(csvFileToDatabaseStep()).end().build();
