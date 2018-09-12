@@ -1,8 +1,21 @@
 package uk.gov.hmrc.regen.quartz;
 
+import java.io.File;
+import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.quartz.JobExecutionContext;
+import org.quartz.JobExecutionException;
+import org.quartz.SchedulerException;
+import org.quartz.Trigger;
+import org.quartz.listeners.JobListenerSupport;
+import org.quartz.listeners.TriggerListenerSupport;
 import org.springframework.batch.core.configuration.JobLocator;
 import org.springframework.batch.core.configuration.JobRegistry;
 import org.springframework.batch.core.configuration.support.JobRegistryBeanPostProcessor;
@@ -16,7 +29,10 @@ import org.springframework.scheduling.quartz.SchedulerFactoryBean;
 
 @Configuration
 public class QuartzConfiguration {
-	
+
+	private static final String INPUT_FILE = "file:///home/regen/temp/fileinput/files/inputFile.csv";
+	private static final String OUTPUT_FILE = "file:///home/regen/temp/fileinput/files/process/inputFile.csv";
+
 	@Autowired
 	private JobLauncher jobLauncher;
 	@Autowired
@@ -28,12 +44,12 @@ public class QuartzConfiguration {
 		jobRegistryBeanPostProcessor.setJobRegistry(jobRegistry);
 		return jobRegistryBeanPostProcessor;
 	}
-	
+
 	@Bean
 	public JobDetailFactoryBean jobDetailFactoryBean() {
 		JobDetailFactoryBean factory = new JobDetailFactoryBean();
 		factory.setJobClass(QuartzJobLauncher.class);
-		Map<String,Object> map = new HashMap<>();
+		Map<String, Object> map = new HashMap<>();
 		map.put("jobName", "csvFileToDatabaseJob");
 		map.put("jobLauncher", jobLauncher);
 		map.put("jobLocator", jobLocator);
@@ -56,11 +72,95 @@ public class QuartzConfiguration {
 	}
 
 	@Bean
-	public SchedulerFactoryBean schedulerFactoryBean() {
+	public SchedulerFactoryBean schedulerFactoryBean() throws SchedulerException {
 		SchedulerFactoryBean scheduler = new SchedulerFactoryBean();
 		scheduler.setTriggers(cronTriggerFactoryBean().getObject());
+
+		System.out.println("-------->" + scheduler.getScheduler());
+		scheduler.setGlobalTriggerListeners(new TriggerListenerSupport() {
+
+			@Override
+			public String getName() {
+				return "VetoNoFileListener";
+			}
+
+			@Override
+			public boolean vetoJobExecution(Trigger trigger, JobExecutionContext context) {
+
+				boolean veto = false;
+
+				try {
+					veto = context.getScheduler().getCurrentlyExecutingJobs().size() > 0;
+
+					if (veto) {
+						this.getLog().info("Veto due to process already executing");
+					} else {
+						veto = !(new File(new URI(INPUT_FILE)).exists());
+						this.getLog().info("File existence check...Veto trigger " + veto);
+					}
+				} catch (Exception e) {
+					this.getLog().info("File " + INPUT_FILE + " not located...sleeping");
+					veto = true;
+				}
+
+				return veto;
+			}
+
+		});
+		
+		scheduler.setGlobalJobListeners(new JobListenerSupport() {
+			
+			@Override
+			public void jobToBeExecuted(JobExecutionContext context) {
+				if (context.getJobDetail().getKey().getName().equals("csv_job")) {
+					this.getLog().info("Performing job set-up for csv processing");
+					
+					try {
+						Path dest = Files.move(Paths.get(new URI(INPUT_FILE)), 
+											   Paths.get(new URI(OUTPUT_FILE)));
+						
+						if (dest == null) {
+							throw new Exception("Unable to move file:" + INPUT_FILE + " to " + OUTPUT_FILE);
+						}
+					}
+					catch (Exception e) {
+						this.getLog().error(e.getMessage());
+					}
+				}
+			}
+
+			
+			@Override
+			public void jobWasExecuted(JobExecutionContext context, JobExecutionException jobException) {
+				if (context.getJobDetail().getKey().getName().equals("csv_job") && jobException == null) {
+					this.getLog().info("Performing job wrap-up for csv processing");
+					
+					try {
+						SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmm");
+						String NO = OUTPUT_FILE + sdf.format(new Date());
+						Path dest = Files.move(Paths.get(new URI(OUTPUT_FILE)), 
+											   Paths.get(new URI(NO)));
+						
+						if (dest == null) {
+							throw new Exception("Unable to move file:" + OUTPUT_FILE + " to " + NO);
+						}
+					}
+					catch (Exception e) {
+						this.getLog().error(e.getMessage());
+					}
+					
+				}
+			}
+
+
+			@Override
+			public String getName() {
+				// TODO Auto-generated method stub
+				return "BeforeTheJob";
+			}
+		});
+
 		return scheduler;
 	}
 
 }
-

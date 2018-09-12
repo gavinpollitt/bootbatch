@@ -34,6 +34,57 @@ public class JobCompletionNotificationListener extends JobExecutionListenerSuppo
 
 			results.forEach((x) -> log.info("Discovered <" + x + "> in the database."));
 		}
+		
+		System.out.println("Spring tables-->");
+		List<BatchStepInstance> results = jdbcTemplate.query("SELECT step_execution_id, job_execution_id, status, exit_code FROM BATCH_STEP_EXECUTION", 
+				(ResultSet rs, int row) -> new BatchStepInstance(rs.getLong(1), rs.getLong(2), rs.getString(3), rs.getString(4)));
+		results.forEach((x) -> log.info("Spring Batch <" + x + "> in the database."));
 	}
 	
+	public static class BatchStepInstance {
+		private Long jeid;
+		private Long jid;
+		private String status;
+		private String exitCode;
+		
+		public BatchStepInstance(Long jeid, Long jid, String status, String exitCode) {
+			this.jeid = jeid;
+			this.jid = jid;
+			this.status = status;
+			this.exitCode = exitCode;
+		}
+		
+		public Long getJeid() {
+			return jeid;
+		}
+		public void setJeid(Long jeid) {
+			this.jeid = jeid;
+		}
+		public Long getJid() {
+			return jid;
+		}
+		public void setJid(Long jid) {
+			this.jid = jid;
+		}
+		public String getStatus() {
+			return status;
+		}
+		public void setStatus(String status) {
+			this.status = status;
+		}
+		public String getExitCode() {
+			return exitCode;
+		}
+		public void setExitCode(String exitCode) {
+			this.exitCode = exitCode;
+		}
+		
+		public String toString() {
+			return this.jeid + "::" + this.jid + "::" + this.getStatus() + "::" + this.getExitCode();
+		}
+		
+	}
 }
+
+
+
