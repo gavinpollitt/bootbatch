@@ -1,4 +1,4 @@
-package uk.gov.hmrc.regen;
+package uk.gov.hmrc.regen.in;
 
 import java.net.MalformedURLException;
 
@@ -24,6 +24,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.UrlResource;
 
+import uk.gov.hmrc.regen.common.SourceContentDTO;
+
 @EnableBatchProcessing
 @Configuration
 public class CsvFileToDatabaseConfig {
@@ -41,23 +43,23 @@ public class CsvFileToDatabaseConfig {
 	public DataSource dataSource;
 
 	@Bean
-	public FlatFileItemReader<FileContentDTO> csvFileReader() throws MalformedURLException {
+	public FlatFileItemReader<SourceContentDTO> csvFileReader() throws MalformedURLException {
 		log.info("Entering csvFileReader");
-		FlatFileItemReader<FileContentDTO> reader = new FlatFileItemReader<FileContentDTO>();
+		FlatFileItemReader<SourceContentDTO> reader = new FlatFileItemReader<SourceContentDTO>();
 		reader.setStrict(false); // Don't fail if file not there
 
 		reader.setResource(new UrlResource(INPUT_FILE));
 
-		reader.setLineMapper(new DefaultLineMapper<FileContentDTO>() {
+		reader.setLineMapper(new DefaultLineMapper<SourceContentDTO>() {
 			{
 				setLineTokenizer(new DelimitedLineTokenizer() {
 					{
 						setNames(new String[] { "field1", "field2", "field3" });
 					}
 				});
-				setFieldSetMapper(new BeanWrapperFieldSetMapper<FileContentDTO>() {
+				setFieldSetMapper(new BeanWrapperFieldSetMapper<SourceContentDTO>() {
 					{
-						setTargetType(FileContentDTO.class);
+						setTargetType(SourceContentDTO.class);
 					}
 				});
 			}
@@ -66,14 +68,14 @@ public class CsvFileToDatabaseConfig {
 	}
 
 	@Bean
-	ItemProcessor<FileContentDTO, FileContentDTO> csvFileProcessor() {
+	ItemProcessor<SourceContentDTO, SourceContentDTO> csvFileProcessor() {
 		log.info("Entering csvFileProcessor");
 		return (fileContentDTO) -> {
-			final String field1 = fileContentDTO.getField1();
-			final String field2 = fileContentDTO.getField2();
-			final String field3 = fileContentDTO.getField3();
+			final String field1 = "READ:" + fileContentDTO.getField1();
+			final String field2 = "READ:" + fileContentDTO.getField2();
+			final String field3 = "READ:" + fileContentDTO.getField3();
 
-			final FileContentDTO actualFCDTO = new FileContentDTO(field1, field2, field3);
+			final SourceContentDTO actualFCDTO = new SourceContentDTO(field1, field2, field3);
 
 			log.info("Converting (" + fileContentDTO + ") into (" + actualFCDTO + ")");
 
@@ -82,10 +84,10 @@ public class CsvFileToDatabaseConfig {
 	}
 
 	@Bean
-	public JdbcBatchItemWriter<FileContentDTO> toDBWriter() {
+	public JdbcBatchItemWriter<SourceContentDTO> toDBWriter() {
 		log.info("Entering toDBWriter");
-		JdbcBatchItemWriter<FileContentDTO> toDBWriter = new JdbcBatchItemWriter<FileContentDTO>();
-		toDBWriter.setItemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<FileContentDTO>());
+		JdbcBatchItemWriter<SourceContentDTO> toDBWriter = new JdbcBatchItemWriter<SourceContentDTO>();
+		toDBWriter.setItemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<SourceContentDTO>());
 		toDBWriter.setSql("INSERT INTO FIELDS (field1, field2, field3) VALUES (:field1, :field2, :field3)");
 		toDBWriter.setDataSource(dataSource);
 		return toDBWriter;
@@ -99,7 +101,7 @@ public class CsvFileToDatabaseConfig {
 		log.info("Entering csvFileToDatabaseStep");
 
 		return stepBuilderFactory.get("csvFileToDatabaseStep").allowStartIfComplete(true)
-				.<FileContentDTO, FileContentDTO> chunk(5).reader(csvFileReader()).processor(csvFileProcessor())
+				.<SourceContentDTO, SourceContentDTO> chunk(5).reader(csvFileReader()).processor(csvFileProcessor())
 				.writer(toDBWriter()).build();
 	}
 

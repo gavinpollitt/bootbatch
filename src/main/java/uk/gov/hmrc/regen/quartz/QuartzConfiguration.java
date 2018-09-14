@@ -16,6 +16,8 @@ import org.quartz.SchedulerException;
 import org.quartz.Trigger;
 import org.quartz.listeners.JobListenerSupport;
 import org.quartz.listeners.TriggerListenerSupport;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.configuration.JobLocator;
 import org.springframework.batch.core.configuration.JobRegistry;
 import org.springframework.batch.core.configuration.support.JobRegistryBeanPostProcessor;
@@ -27,9 +29,13 @@ import org.springframework.scheduling.quartz.CronTriggerFactoryBean;
 import org.springframework.scheduling.quartz.JobDetailFactoryBean;
 import org.springframework.scheduling.quartz.SchedulerFactoryBean;
 
+import uk.gov.hmrc.regen.in.CsvFileToDatabaseConfig;
+
 @Configuration
 public class QuartzConfiguration {
 
+	private static final Logger log = LoggerFactory.getLogger(QuartzConfiguration.class);
+	
 	private static final String INPUT_FILE = "file:///home/regen/temp/fileinput/files/inputFile.csv";
 	private static final String OUTPUT_FILE = "file:///home/regen/temp/fileinput/files/process/inputFile.csv";
 
@@ -46,7 +52,7 @@ public class QuartzConfiguration {
 	}
 
 	@Bean
-	public JobDetailFactoryBean jobDetailFactoryBean() {
+	public JobDetailFactoryBean csvJobDetailFactoryBean() {
 		JobDetailFactoryBean factory = new JobDetailFactoryBean();
 		factory.setJobClass(QuartzJobLauncher.class);
 		Map<String, Object> map = new HashMap<>();
@@ -59,22 +65,47 @@ public class QuartzConfiguration {
 		return factory;
 	}
 
-	// Job is scheduled after every 2 minute
 	@Bean
-	public CronTriggerFactoryBean cronTriggerFactoryBean() {
+	public CronTriggerFactoryBean csvCronTriggerFactoryBean() {
 		CronTriggerFactoryBean stFactory = new CronTriggerFactoryBean();
-		stFactory.setJobDetail(jobDetailFactoryBean().getObject());
+		stFactory.setJobDetail(csvJobDetailFactoryBean().getObject());
 		stFactory.setStartDelay(3000);
-		stFactory.setName("cron_trigger");
-		stFactory.setGroup("cron_group");
+		stFactory.setName("csv_cron_trigger");
+		stFactory.setGroup("csv_group");
 		stFactory.setCronExpression("0 0/1 * 1/1 * ? *");
 		return stFactory;
 	}
 
 	@Bean
+	public JobDetailFactoryBean dbJobDetailFactoryBean() {
+		JobDetailFactoryBean factory = new JobDetailFactoryBean();
+		factory.setJobClass(QuartzJobLauncher.class);
+		Map<String, Object> map = new HashMap<>();
+		map.put("jobName", "databaseToFileJob");
+		map.put("jobLauncher", jobLauncher);
+		map.put("jobLocator", jobLocator);
+		factory.setJobDataAsMap(map);
+		factory.setGroup("csv_group");
+		factory.setName("db_job");
+		return factory;
+	}
+
+	@Bean
+	public CronTriggerFactoryBean dbCronTriggerFactoryBean() {
+		CronTriggerFactoryBean stFactory = new CronTriggerFactoryBean();
+		stFactory.setJobDetail(dbJobDetailFactoryBean().getObject());
+		stFactory.setStartDelay(3000);
+		stFactory.setName("db_cron_trigger");
+		stFactory.setGroup("scv_group");
+		stFactory.setCronExpression("0 0/3 * 1/1 * ? *");
+		return stFactory;
+	}
+	
+	@Bean
 	public SchedulerFactoryBean schedulerFactoryBean() throws SchedulerException {
+		log.info("Creating the scheduler");
 		SchedulerFactoryBean scheduler = new SchedulerFactoryBean();
-		scheduler.setTriggers(cronTriggerFactoryBean().getObject());
+		scheduler.setTriggers(csvCronTriggerFactoryBean().getObject());
 
 		System.out.println("-------->" + scheduler.getScheduler());
 		scheduler.setGlobalTriggerListeners(new TriggerListenerSupport() {
@@ -89,69 +120,64 @@ public class QuartzConfiguration {
 
 				boolean veto = false;
 
-				try {
-					veto = context.getScheduler().getCurrentlyExecutingJobs().size() > 0;
+				if (context.getJobDetail().getKey().getName().equals("csv_job")) {
+					try {
+						veto = context.getScheduler().getCurrentlyExecutingJobs().size() > 0;
 
-					if (veto) {
-						this.getLog().info("Veto due to process already executing");
-					} else {
-						veto = !(new File(new URI(INPUT_FILE)).exists());
-						this.getLog().info("File existence check...Veto trigger " + veto);
+						if (veto) {
+							this.getLog().info("Veto due to process already executing");
+						} else {
+							veto = !(new File(new URI(INPUT_FILE)).exists());
+							this.getLog().info("File existence check...Veto trigger " + veto);
+						}
+					} catch (Exception e) {
+						this.getLog().info("File " + INPUT_FILE + " not located...sleeping");
+						veto = true;
 					}
-				} catch (Exception e) {
-					this.getLog().info("File " + INPUT_FILE + " not located...sleeping");
-					veto = true;
 				}
-
 				return veto;
 			}
 
 		});
-		
+
 		scheduler.setGlobalJobListeners(new JobListenerSupport() {
-			
+
 			@Override
 			public void jobToBeExecuted(JobExecutionContext context) {
 				if (context.getJobDetail().getKey().getName().equals("csv_job")) {
 					this.getLog().info("Performing job set-up for csv processing");
-					
+
 					try {
-						Path dest = Files.move(Paths.get(new URI(INPUT_FILE)), 
-											   Paths.get(new URI(OUTPUT_FILE)));
-						
+						Path dest = Files.move(Paths.get(new URI(INPUT_FILE)), Paths.get(new URI(OUTPUT_FILE)));
+
 						if (dest == null) {
 							throw new Exception("Unable to move file:" + INPUT_FILE + " to " + OUTPUT_FILE);
 						}
-					}
-					catch (Exception e) {
+					} catch (Exception e) {
 						this.getLog().error(e.getMessage());
 					}
 				}
 			}
 
-			
 			@Override
 			public void jobWasExecuted(JobExecutionContext context, JobExecutionException jobException) {
 				if (context.getJobDetail().getKey().getName().equals("csv_job") && jobException == null) {
 					this.getLog().info("Performing job wrap-up for csv processing");
-					
+
 					try {
 						SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmm");
 						String NO = OUTPUT_FILE + sdf.format(new Date());
-						Path dest = Files.move(Paths.get(new URI(OUTPUT_FILE)), 
-											   Paths.get(new URI(NO)));
-						
+						Path dest = Files.move(Paths.get(new URI(OUTPUT_FILE)), Paths.get(new URI(NO)));
+
 						if (dest == null) {
 							throw new Exception("Unable to move file:" + OUTPUT_FILE + " to " + NO);
 						}
-					}
-					catch (Exception e) {
+					} catch (Exception e) {
 						this.getLog().error(e.getMessage());
 					}
-					
+
 				}
 			}
-
 
 			@Override
 			public String getName() {

@@ -1,4 +1,4 @@
-package uk.gov.hmrc.regen;
+package uk.gov.hmrc.regen.common;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

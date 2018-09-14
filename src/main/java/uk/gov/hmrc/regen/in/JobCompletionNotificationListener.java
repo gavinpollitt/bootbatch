@@ -1,4 +1,4 @@
-package uk.gov.hmrc.regen;
+package uk.gov.hmrc.regen.in;
 
 import java.sql.ResultSet;
 import java.util.List;
@@ -11,6 +11,8 @@ import org.springframework.batch.core.listener.JobExecutionListenerSupport;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+
+import uk.gov.hmrc.regen.common.SourceContentDTO;
 
 @Component
 public class JobCompletionNotificationListener extends JobExecutionListenerSupport {
@@ -29,8 +31,8 @@ public class JobCompletionNotificationListener extends JobExecutionListenerSuppo
 		if(jobExecution.getStatus() == BatchStatus.COMPLETED) {
 			log.info("============ JOB FINISHED ============ Verifying the results....\n");
 
-			List<FileContentDTO> results = jdbcTemplate.query("SELECT field1, field2, field3 FROM FIELDS", 
-					(ResultSet rs, int row) -> new FileContentDTO(rs.getString(1), rs.getString(2), rs.getString(3)));
+			List<SourceContentDTO> results = jdbcTemplate.query("SELECT field1, field2, field3 FROM FIELDS", 
+					(ResultSet rs, int row) -> new SourceContentDTO(rs.getString(1), rs.getString(2), rs.getString(3)));
 
 			results.forEach((x) -> log.info("Discovered <" + x + "> in the database."));
 		}

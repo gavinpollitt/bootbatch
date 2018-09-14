@@ -1,18 +1,18 @@
-package uk.gov.hmrc.regen;
+package uk.gov.hmrc.regen.common;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
-public class FileContentDTO {
+public class SourceContentDTO {
 
 	private String field1;
 	private String field2;
 	private String field3;
 
-	public FileContentDTO() {
+	public SourceContentDTO() {
 
 	}
 
-	public FileContentDTO(final String field1, String field2, String field3) {
+	public SourceContentDTO(final String field1, String field2, String field3) {
 		this.field1 = field1;
 		this.field2 = field2;
 		this.field3 = field3;
