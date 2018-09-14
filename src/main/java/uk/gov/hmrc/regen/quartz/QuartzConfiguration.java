@@ -97,7 +97,7 @@ public class QuartzConfiguration {
 		stFactory.setStartDelay(3000);
 		stFactory.setName("db_cron_trigger");
 		stFactory.setGroup("scv_group");
-		stFactory.setCronExpression("0 0/3 * 1/1 * ? *");
+		stFactory.setCronExpression("30 0/3 * 1/1 * ? *");
 		return stFactory;
 	}
 	
@@ -105,7 +105,8 @@ public class QuartzConfiguration {
 	public SchedulerFactoryBean schedulerFactoryBean() throws SchedulerException {
 		log.info("Creating the scheduler");
 		SchedulerFactoryBean scheduler = new SchedulerFactoryBean();
-		scheduler.setTriggers(csvCronTriggerFactoryBean().getObject());
+		scheduler.setTriggers(csvCronTriggerFactoryBean().getObject(),
+							  dbCronTriggerFactoryBean().getObject());
 
 		System.out.println("-------->" + scheduler.getScheduler());
 		scheduler.setGlobalTriggerListeners(new TriggerListenerSupport() {

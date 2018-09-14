@@ -108,7 +108,7 @@ public class DatabaseToFileConfig {
 	public Step datatabaseToFileStep() throws Exception {
 		log.info("Entering csvFileToDatabaseStep");
 
-		return stepBuilderFactory.get("csvFileToDatabaseStep").allowStartIfComplete(true)
+		return stepBuilderFactory.get("datatabaseToFileStep").allowStartIfComplete(true)
 				.<SourceContentDTO, SourceContentDTO> chunk(5).reader(dbItemReader()).processor(dbContentProcessor())
 				.writer(fileItemWriter()).build();
 	}
@@ -116,7 +116,7 @@ public class DatabaseToFileConfig {
 	@Bean
 	Job databaseToFileJob(JobCompletionNotificationListener listener) throws Exception {
 		log.info("Entering csvFileToDatabaseJob");
-		return jobBuilderFactory.get("csvFileToDatabaseJob").incrementer(new RunIdIncrementer()).listener(listener)
+		return jobBuilderFactory.get("databaseToFileJob").incrementer(new RunIdIncrementer()).listener(listener)
 				.flow(datatabaseToFileStep()).end().build();
 	}
 	// end job info
