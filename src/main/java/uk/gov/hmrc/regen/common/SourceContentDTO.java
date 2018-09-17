@@ -1,12 +1,22 @@
 package uk.gov.hmrc.regen.common;
 
+import javax.validation.constraints.Pattern;
+import javax.validation.constraints.Size;
+
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
 public class SourceContentDTO {
 
+	@Size(min = 3, max = 30)
+	@Pattern(regexp="^[A-Z].* - fieldC1.*")
 	private String field1;
+	
+	@Size(min = 3, max = 30)
 	private String field2;
+	
+	@Size(min = 3, max = 30)
 	private String field3;
+	
 	private Boolean processed = null;
 
 	public SourceContentDTO() {

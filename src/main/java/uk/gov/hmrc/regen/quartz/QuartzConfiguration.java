@@ -162,6 +162,7 @@ public class QuartzConfiguration {
 
 			@Override
 			public void jobWasExecuted(JobExecutionContext context, JobExecutionException jobException) {
+				log.info("Job: " + context.getJobDetail().getKey().getName() + ", Exception: " + jobException + ", Status: " + context.getResult());
 				if (context.getJobDetail().getKey().getName().equals("csv_job") && jobException == null) {
 					this.getLog().info("Performing job wrap-up for csv processing");
 

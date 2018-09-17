@@ -1,8 +1,12 @@
 package uk.gov.hmrc.regen.in;
 
 import java.net.MalformedURLException;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.sql.DataSource;
+import javax.validation.ValidationException;
+import javax.validation.Validator;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,10 +23,12 @@ import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;
 import org.springframework.batch.item.file.mapping.DefaultLineMapper;
 import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
+import org.springframework.batch.item.support.CompositeItemProcessor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.UrlResource;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import uk.gov.hmrc.regen.common.SourceContentDTO;
 
@@ -34,13 +40,16 @@ public class CsvFileToDatabaseConfig {
 	private static final String INPUT_FILE = "file:///home/regen/temp/fileinput/files/process/inputFile.csv";
 
 	@Autowired
-	public JobBuilderFactory jobBuilderFactory;
+	private JobBuilderFactory jobBuilderFactory;
 
 	@Autowired
-	public StepBuilderFactory stepBuilderFactory;
+	private StepBuilderFactory stepBuilderFactory;
 
 	@Autowired
-	public DataSource dataSource;
+	private DataSource dataSource;
+	
+	@Autowired 
+	private RecordValidationListener validationListener;
 
 	@Bean
 	public FlatFileItemReader<SourceContentDTO> csvFileReader() throws MalformedURLException {
@@ -67,6 +76,12 @@ public class CsvFileToDatabaseConfig {
 		return reader;
 	}
 
+	
+    @Bean
+    public Validator validatorFactory () {
+        return new LocalValidatorFactoryBean();
+    }
+    
 	@Bean
 	ItemProcessor<SourceContentDTO, SourceContentDTO> csvFileProcessor() {
 		log.info("Entering csvFileProcessor");
@@ -82,6 +97,15 @@ public class CsvFileToDatabaseConfig {
 			return actualFCDTO;
 		};
 	}
+	
+	@Bean
+	ItemProcessor<SourceContentDTO, SourceContentDTO> inputProcessor() {
+		CompositeItemProcessor<SourceContentDTO, SourceContentDTO> processor = new CompositeItemProcessor<>();
+		List<ItemProcessor<? super SourceContentDTO, ? super SourceContentDTO>> allProcessors = new ArrayList<>(2);
+		allProcessors.add(csvFileProcessor());
+		processor.setDelegates(allProcessors);
+		return processor;
+	}
 
 	@Bean
 	public JdbcBatchItemWriter<SourceContentDTO> toDBWriter() {
@@ -93,16 +117,19 @@ public class CsvFileToDatabaseConfig {
 		return toDBWriter;
 	}
 
-	// end reader, writer, and processor
 
-	// begin job info
 	@Bean
 	public Step csvFileToDatabaseStep() throws Exception {
 		log.info("Entering csvFileToDatabaseStep");
 
-		return stepBuilderFactory.get("csvFileToDatabaseStep").allowStartIfComplete(true)
-				.<SourceContentDTO, SourceContentDTO> chunk(5).reader(csvFileReader()).processor(csvFileProcessor())
-				.writer(toDBWriter()).build();
+		return stepBuilderFactory.get("csvFileToDatabaseStep").allowStartIfComplete(true).
+				<SourceContentDTO, SourceContentDTO> chunk(5).
+				faultTolerant().noSkip(ValidationException.class).
+				reader(csvFileReader()).
+				processor(csvFileProcessor()).
+				writer(toDBWriter()).
+				listener(validationListener).
+				build();
 	}
 
 	@Bean
