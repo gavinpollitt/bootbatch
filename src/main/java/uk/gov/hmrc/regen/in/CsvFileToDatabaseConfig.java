@@ -88,7 +88,7 @@ public class CsvFileToDatabaseConfig {
 		log.info("Entering toDBWriter");
 		JdbcBatchItemWriter<SourceContentDTO> toDBWriter = new JdbcBatchItemWriter<SourceContentDTO>();
 		toDBWriter.setItemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<SourceContentDTO>());
-		toDBWriter.setSql("INSERT INTO FIELDS (field1, field2, field3) VALUES (:field1, :field2, :field3)");
+		toDBWriter.setSql("INSERT INTO FIELDS (field1, field2, field3, processed) VALUES (:field1, :field2, :field3, false)");
 		toDBWriter.setDataSource(dataSource);
 		return toDBWriter;
 	}

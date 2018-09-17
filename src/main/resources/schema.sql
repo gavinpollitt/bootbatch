@@ -2,5 +2,6 @@ DROP TABLE FIELDS IF EXISTS;
 CREATE TABLE FIELDS  (
     field1 VARCHAR(100),
     field2 VARCHAR(100),
-    field3 VARCHAR(100)
+    field3 VARCHAR(100),
+    processed BOOLEAN
 );

@@ -7,21 +7,27 @@ public class SourceContentDTO {
 	private String field1;
 	private String field2;
 	private String field3;
+	private Boolean processed = null;
 
 	public SourceContentDTO() {
 
 	}
 
-	public SourceContentDTO(final String field1, String field2, String field3) {
+	public SourceContentDTO(final String field1, final String field2, final String field3, final Boolean processed) {
 		this.field1 = field1;
 		this.field2 = field2;
 		this.field3 = field3;
+		this.processed = processed;
+	}
+
+	public SourceContentDTO(final String field1, final String field2, final String field3) {
+		this(field1,field2,field3,false);
 	}
 
 	@Override
 	public String toString() {
 		return new ToStringBuilder(this).append("Field 1:", this.field1).append(" Field 2:", this.field2)
-				.append(" Field 3:", this.field3).toString();
+				.append(" Field 3:", this.field3).toString().concat(this.processed!=null&&this.processed?" and has been processed":" not yet processed");
 	}
 
 	public String getField1() {
@@ -46,6 +52,14 @@ public class SourceContentDTO {
 
 	public void setField3(String field3) {
 		this.field3 = field3;
+	}
+
+	public Boolean getProcessed() {
+		return processed;
+	}
+
+	public void setProcessed(Boolean processed) {
+		this.processed = processed;
 	}
 
 }

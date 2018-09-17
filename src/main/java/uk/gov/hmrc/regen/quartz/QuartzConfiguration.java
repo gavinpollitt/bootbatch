@@ -29,15 +29,14 @@ import org.springframework.scheduling.quartz.CronTriggerFactoryBean;
 import org.springframework.scheduling.quartz.JobDetailFactoryBean;
 import org.springframework.scheduling.quartz.SchedulerFactoryBean;
 
-import uk.gov.hmrc.regen.in.CsvFileToDatabaseConfig;
-
 @Configuration
 public class QuartzConfiguration {
 
 	private static final Logger log = LoggerFactory.getLogger(QuartzConfiguration.class);
 	
 	private static final String INPUT_FILE = "file:///home/regen/temp/fileinput/files/inputFile.csv";
-	private static final String OUTPUT_FILE = "file:///home/regen/temp/fileinput/files/process/inputFile.csv";
+	private static final String PROCESSED_FILE = "file:///home/regen/temp/fileinput/files/process/inputFile.csv";
+	private static final String OUTPUT_FILE = "file:///home/regen/temp/fileinput/files/output/outputFile";
 
 	@Autowired
 	private JobLauncher jobLauncher;
@@ -149,10 +148,10 @@ public class QuartzConfiguration {
 					this.getLog().info("Performing job set-up for csv processing");
 
 					try {
-						Path dest = Files.move(Paths.get(new URI(INPUT_FILE)), Paths.get(new URI(OUTPUT_FILE)));
+						Path dest = Files.move(Paths.get(new URI(INPUT_FILE)), Paths.get(new URI(PROCESSED_FILE)));
 
 						if (dest == null) {
-							throw new Exception("Unable to move file:" + INPUT_FILE + " to " + OUTPUT_FILE);
+							throw new Exception("Unable to move file:" + INPUT_FILE + " to " + PROCESSED_FILE);
 						}
 					} catch (Exception e) {
 						this.getLog().error(e.getMessage());
@@ -164,6 +163,22 @@ public class QuartzConfiguration {
 			public void jobWasExecuted(JobExecutionContext context, JobExecutionException jobException) {
 				if (context.getJobDetail().getKey().getName().equals("csv_job") && jobException == null) {
 					this.getLog().info("Performing job wrap-up for csv processing");
+
+					try {
+						SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmm");
+						String NO = PROCESSED_FILE + sdf.format(new Date());
+						Path dest = Files.move(Paths.get(new URI(PROCESSED_FILE)), Paths.get(new URI(NO)));
+
+						if (dest == null) {
+							throw new Exception("Unable to move file:" + PROCESSED_FILE + " to " + NO);
+						}
+					} catch (Exception e) {
+						this.getLog().error(e.getMessage());
+					}
+
+				}
+				else if (context.getJobDetail().getKey().getName().equals("db_job") && jobException == null) {
+					this.getLog().info("Performing job wrap-up for database processing");
 
 					try {
 						SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmm");

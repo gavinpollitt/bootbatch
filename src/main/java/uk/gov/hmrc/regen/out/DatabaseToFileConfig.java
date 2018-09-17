@@ -2,6 +2,9 @@ package uk.gov.hmrc.regen.out;
 
 import java.io.File;
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import javax.sql.DataSource;
 
@@ -16,12 +19,15 @@ import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
+import org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider;
+import org.springframework.batch.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.item.database.JdbcCursorItemReader;
 import org.springframework.batch.item.file.FlatFileItemWriter;
 import org.springframework.batch.item.file.transform.BeanWrapperFieldExtractor;
 import org.springframework.batch.item.file.transform.FieldExtractor;
 import org.springframework.batch.item.file.transform.FormatterLineAggregator;
 import org.springframework.batch.item.file.transform.LineAggregator;
+import org.springframework.batch.item.support.CompositeItemWriter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -53,7 +59,7 @@ public class DatabaseToFileConfig {
 		JdbcCursorItemReader<SourceContentDTO> databaseReader = new JdbcCursorItemReader<>();
 
 		databaseReader.setDataSource(dataSource);
-		databaseReader.setSql("SELECT field1, field2, field3 FROM fields");
+		databaseReader.setSql("SELECT field1, field2, field3 FROM fields WHERE processed is not true");
 		databaseReader.setRowMapper(new BeanPropertyRowMapper<>(SourceContentDTO.class));
 
 		return databaseReader;
@@ -62,17 +68,7 @@ public class DatabaseToFileConfig {
 	@Bean
 	ItemProcessor<SourceContentDTO, SourceContentDTO> dbContentProcessor() {
 		log.info("Entering dbContentProcessor");
-		return (dbContentDTO) -> {
-			final String field1 = "READ:" + dbContentDTO.getField1();
-			final String field2 = "READ:" + dbContentDTO.getField2();
-			final String field3 = "READ:" + dbContentDTO.getField3();
-
-			final SourceContentDTO actualFCDTO = new SourceContentDTO(field1, field2, field3);
-
-			log.info("Converting (" + dbContentDTO + ") into (" + actualFCDTO + ")");
-
-			return actualFCDTO;
-		};
+		return (dbContentDTO) -> dbContentDTO;
 	}
 
 	private FieldExtractor<SourceContentDTO> createSourceFieldExtractor() {
@@ -103,6 +99,26 @@ public class DatabaseToFileConfig {
 		return outputFileWriter;
 	}
 
+	@Bean
+	public JdbcBatchItemWriter<SourceContentDTO> updateDBWriter() {
+		log.info("Entering updateDBWriter");
+		JdbcBatchItemWriter<SourceContentDTO> toDBWriter = new JdbcBatchItemWriter<SourceContentDTO>();
+		toDBWriter.setItemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<SourceContentDTO>());
+		toDBWriter.setSql("UPDATE fields SET processed = true WHERE field1 = :field1");
+		toDBWriter.setDataSource(dataSource);
+		return toDBWriter;
+	}
+	@Bean
+	ItemWriter<SourceContentDTO> outputWriter() throws Exception {
+		CompositeItemWriter<SourceContentDTO> writer = new CompositeItemWriter<>();
+		List<ItemWriter<? super SourceContentDTO>> allWriters = new ArrayList<>(2);
+		allWriters.add(fileItemWriter());
+		allWriters.add(updateDBWriter());
+		writer.setDelegates(allWriters);
+		return writer;
+	}
+	
+
 	// begin job info
 	@Bean
 	public Step datatabaseToFileStep() throws Exception {
@@ -110,7 +126,7 @@ public class DatabaseToFileConfig {
 
 		return stepBuilderFactory.get("datatabaseToFileStep").allowStartIfComplete(true)
 				.<SourceContentDTO, SourceContentDTO> chunk(5).reader(dbItemReader()).processor(dbContentProcessor())
-				.writer(fileItemWriter()).build();
+				.writer(outputWriter()).build();
 	}
 
 	@Bean

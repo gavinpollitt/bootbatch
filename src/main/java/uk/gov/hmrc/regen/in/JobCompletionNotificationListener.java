@@ -31,8 +31,8 @@ public class JobCompletionNotificationListener extends JobExecutionListenerSuppo
 		if(jobExecution.getStatus() == BatchStatus.COMPLETED) {
 			log.info("============ JOB FINISHED ============ Verifying the results....\n");
 
-			List<SourceContentDTO> results = jdbcTemplate.query("SELECT field1, field2, field3 FROM FIELDS", 
-					(ResultSet rs, int row) -> new SourceContentDTO(rs.getString(1), rs.getString(2), rs.getString(3)));
+			List<SourceContentDTO> results = jdbcTemplate.query("SELECT field1, field2, field3, processed FROM FIELDS", 
+					(ResultSet rs, int row) -> new SourceContentDTO(rs.getString(1), rs.getString(2), rs.getString(3), rs.getBoolean(4)));
 
 			results.forEach((x) -> log.info("Discovered <" + x + "> in the database."));
 		}
