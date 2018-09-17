@@ -106,7 +106,7 @@ public class CsvFileToDatabaseConfig {
 	}
 
 	@Bean
-	Job csvFileToDatabaseJob(JobCompletionNotificationListener listener) throws Exception {
+	Job csvFileToDatabaseJob(FileReadCompletionListener listener) throws Exception {
 		log.info("Entering csvFileToDatabaseJob");
 		return jobBuilderFactory.get("csvFileToDatabaseJob").incrementer(new RunIdIncrementer()).listener(listener)
 				.flow(csvFileToDatabaseStep()).end().build();

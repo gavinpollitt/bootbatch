@@ -35,7 +35,7 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
 
 import uk.gov.hmrc.regen.common.SourceContentDTO;
-import uk.gov.hmrc.regen.in.JobCompletionNotificationListener;
+import uk.gov.hmrc.regen.in.FileReadCompletionListener;
 
 @EnableBatchProcessing
 @Configuration
@@ -95,6 +95,7 @@ public class DatabaseToFileConfig {
 
 		LineAggregator<SourceContentDTO> lineAggregator = createSourceLineAggregator();
 		outputFileWriter.setLineAggregator(lineAggregator);
+		outputFileWriter.setShouldDeleteIfEmpty(true);
 
 		return outputFileWriter;
 	}
@@ -121,19 +122,19 @@ public class DatabaseToFileConfig {
 
 	// begin job info
 	@Bean
-	public Step datatabaseToFileStep() throws Exception {
+	public Step datatabaseToFileStep(DBReadStepCompletionListener listener) throws Exception {
 		log.info("Entering csvFileToDatabaseStep");
 
 		return stepBuilderFactory.get("datatabaseToFileStep").allowStartIfComplete(true)
 				.<SourceContentDTO, SourceContentDTO> chunk(5).reader(dbItemReader()).processor(dbContentProcessor())
-				.writer(outputWriter()).build();
+				.writer(outputWriter()).listener(listener).build();
 	}
 
 	@Bean
-	Job databaseToFileJob(JobCompletionNotificationListener listener) throws Exception {
+	Job databaseToFileJob(DBReadStepCompletionListener listener) throws Exception {
 		log.info("Entering csvFileToDatabaseJob");
-		return jobBuilderFactory.get("databaseToFileJob").incrementer(new RunIdIncrementer()).listener(listener)
-				.flow(datatabaseToFileStep()).end().build();
+		return jobBuilderFactory.get("databaseToFileJob").incrementer(new RunIdIncrementer())
+				.flow(datatabaseToFileStep(listener)).end().build();
 	}
 	// end job info
 }

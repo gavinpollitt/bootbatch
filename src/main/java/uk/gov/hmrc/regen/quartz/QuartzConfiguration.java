@@ -3,6 +3,7 @@ package uk.gov.hmrc.regen.quartz;
 import java.io.File;
 import java.net.URI;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
@@ -188,8 +189,10 @@ public class QuartzConfiguration {
 						if (dest == null) {
 							throw new Exception("Unable to move file:" + OUTPUT_FILE + " to " + NO);
 						}
+					} catch (NoSuchFileException fnf) {
+						this.getLog().debug("No output file found to timestamp");
 					} catch (Exception e) {
-						this.getLog().error(e.getMessage());
+						this.getLog().error(e.getClass() + "-->" + e.getMessage());
 					}
 
 				}
