@@ -120,7 +120,6 @@ public class QuartzConfiguration {
 		scheduler.setTriggers(csvCronTriggerFactoryBean().getObject(),
 							  dbCronTriggerFactoryBean().getObject());
 
-		System.out.println("-------->" + scheduler.getScheduler());
 		scheduler.setGlobalTriggerListeners(new TriggerListenerSupport() {
 
 			@Override

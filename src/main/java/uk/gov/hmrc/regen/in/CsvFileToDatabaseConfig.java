@@ -30,6 +30,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.UrlResource;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
+import uk.gov.hmrc.regen.common.ApplicationConfiguration;
 import uk.gov.hmrc.regen.common.SourceContentDTO;
 
 @EnableBatchProcessing
@@ -37,7 +38,8 @@ import uk.gov.hmrc.regen.common.SourceContentDTO;
 public class CsvFileToDatabaseConfig {
 	private static final Logger log = LoggerFactory.getLogger(CsvFileToDatabaseConfig.class);
 
-	private static final String INPUT_FILE = "file:///home/regen/temp/fileinput/files/process/inputFile.csv";
+	@Autowired
+	ApplicationConfiguration config;
 
 	@Autowired
 	private JobBuilderFactory jobBuilderFactory;
@@ -53,11 +55,10 @@ public class CsvFileToDatabaseConfig {
 
 	@Bean
 	public FlatFileItemReader<SourceContentDTO> csvFileReader() throws MalformedURLException {
-		log.info("Entering csvFileReader");
 		FlatFileItemReader<SourceContentDTO> reader = new FlatFileItemReader<SourceContentDTO>();
 		reader.setStrict(false); // Don't fail if file not there
 
-		reader.setResource(new UrlResource(INPUT_FILE));
+		reader.setResource(new UrlResource(config.getPROCESSED_FILE()));
 
 		reader.setLineMapper(new DefaultLineMapper<SourceContentDTO>() {
 			{
@@ -84,7 +85,6 @@ public class CsvFileToDatabaseConfig {
     
 	@Bean
 	ItemProcessor<SourceContentDTO, SourceContentDTO> csvFileProcessor() {
-		log.info("Entering csvFileProcessor");
 		return (fileContentDTO) -> {
 			final String field1 = "READ:" + fileContentDTO.getField1();
 			final String field2 = "READ:" + fileContentDTO.getField2();
@@ -92,7 +92,7 @@ public class CsvFileToDatabaseConfig {
 
 			final SourceContentDTO actualFCDTO = new SourceContentDTO(field1, field2, field3);
 
-			log.info("Converting (" + fileContentDTO + ") into (" + actualFCDTO + ")");
+			log.debug("Converting (" + fileContentDTO + ") into (" + actualFCDTO + ")");
 
 			return actualFCDTO;
 		};
@@ -109,7 +109,6 @@ public class CsvFileToDatabaseConfig {
 
 	@Bean
 	public JdbcBatchItemWriter<SourceContentDTO> toDBWriter() {
-		log.info("Entering toDBWriter");
 		JdbcBatchItemWriter<SourceContentDTO> toDBWriter = new JdbcBatchItemWriter<SourceContentDTO>();
 		toDBWriter.setItemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<SourceContentDTO>());
 		toDBWriter.setSql("INSERT INTO FIELDS (field1, field2, field3, processed) VALUES (:field1, :field2, :field3, false)");
@@ -120,7 +119,6 @@ public class CsvFileToDatabaseConfig {
 
 	@Bean
 	public Step csvFileToDatabaseStep() throws Exception {
-		log.info("Entering csvFileToDatabaseStep");
 
 		return stepBuilderFactory.get("csvFileToDatabaseStep").allowStartIfComplete(true).
 				<SourceContentDTO, SourceContentDTO> chunk(5).
@@ -134,7 +132,6 @@ public class CsvFileToDatabaseConfig {
 
 	@Bean
 	Job csvFileToDatabaseJob(FileReadCompletionListener listener) throws Exception {
-		log.info("Entering csvFileToDatabaseJob");
 		return jobBuilderFactory.get("csvFileToDatabaseJob").incrementer(new RunIdIncrementer()).listener(listener)
 				.flow(csvFileToDatabaseStep()).end().build();
 	}

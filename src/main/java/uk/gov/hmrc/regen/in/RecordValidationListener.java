@@ -28,7 +28,7 @@ public class RecordValidationListener implements ItemReadListener<SourceContentD
 
 	@Override
 	public void afterRead(SourceContentDTO item) {
-		log.info("Validating " + item);
+		log.debug("Validating " + item);
 		
 		Set<ConstraintViolation<SourceContentDTO>> violations = validator.validate(item);
 		

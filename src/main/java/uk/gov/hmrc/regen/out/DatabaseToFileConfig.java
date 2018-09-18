@@ -3,7 +3,6 @@ package uk.gov.hmrc.regen.out;
 import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import javax.sql.DataSource;
@@ -34,15 +33,16 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
 
+import uk.gov.hmrc.regen.common.ApplicationConfiguration;
 import uk.gov.hmrc.regen.common.SourceContentDTO;
-import uk.gov.hmrc.regen.in.FileReadCompletionListener;
 
 @EnableBatchProcessing
 @Configuration
 public class DatabaseToFileConfig {
 	private static final Logger log = LoggerFactory.getLogger(DatabaseToFileConfig.class);
 
-	private static final String OUTPUT_FILE = "file:///home/regen/temp/fileinput/files/output/outputFile";
+	@Autowired
+	ApplicationConfiguration config;
 
 	@Autowired
 	public JobBuilderFactory jobBuilderFactory;
@@ -55,7 +55,6 @@ public class DatabaseToFileConfig {
 
 	@Bean
 	ItemReader<SourceContentDTO> dbItemReader() {
-		log.info("Entering databaseItemReader");
 		JdbcCursorItemReader<SourceContentDTO> databaseReader = new JdbcCursorItemReader<>();
 
 		databaseReader.setDataSource(dataSource);
@@ -67,7 +66,6 @@ public class DatabaseToFileConfig {
 
 	@Bean
 	ItemProcessor<SourceContentDTO, SourceContentDTO> dbContentProcessor() {
-		log.info("Entering dbContentProcessor");
 		return (dbContentDTO) -> dbContentDTO;
 	}
 
@@ -91,7 +89,7 @@ public class DatabaseToFileConfig {
 	ItemWriter<SourceContentDTO> fileItemWriter() throws Exception {
 		FlatFileItemWriter<SourceContentDTO> outputFileWriter = new FlatFileItemWriter<>();
 
-		outputFileWriter.setResource(new FileSystemResource(new File(new URI(OUTPUT_FILE))));
+		outputFileWriter.setResource(new FileSystemResource(new File(new URI(config.getOUTPUT_FILE()))));
 
 		LineAggregator<SourceContentDTO> lineAggregator = createSourceLineAggregator();
 		outputFileWriter.setLineAggregator(lineAggregator);
@@ -102,7 +100,6 @@ public class DatabaseToFileConfig {
 
 	@Bean
 	public JdbcBatchItemWriter<SourceContentDTO> updateDBWriter() {
-		log.info("Entering updateDBWriter");
 		JdbcBatchItemWriter<SourceContentDTO> toDBWriter = new JdbcBatchItemWriter<SourceContentDTO>();
 		toDBWriter.setItemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<SourceContentDTO>());
 		toDBWriter.setSql("UPDATE fields SET processed = true WHERE field1 = :field1");
@@ -123,7 +120,6 @@ public class DatabaseToFileConfig {
 	// begin job info
 	@Bean
 	public Step datatabaseToFileStep(DBReadStepCompletionListener listener) throws Exception {
-		log.info("Entering csvFileToDatabaseStep");
 
 		return stepBuilderFactory.get("datatabaseToFileStep").allowStartIfComplete(true)
 				.<SourceContentDTO, SourceContentDTO> chunk(5).reader(dbItemReader()).processor(dbContentProcessor())
@@ -132,7 +128,6 @@ public class DatabaseToFileConfig {
 
 	@Bean
 	Job databaseToFileJob(DBReadStepCompletionListener listener) throws Exception {
-		log.info("Entering csvFileToDatabaseJob");
 		return jobBuilderFactory.get("databaseToFileJob").incrementer(new RunIdIncrementer())
 				.flow(datatabaseToFileStep(listener)).end().build();
 	}

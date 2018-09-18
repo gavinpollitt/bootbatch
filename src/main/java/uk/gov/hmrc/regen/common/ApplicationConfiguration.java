@@ -5,11 +5,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@ConfigurationProperties
 public class ApplicationConfiguration {
 	@Value("${input.inputFile}")
 	private String INPUT_FILE;

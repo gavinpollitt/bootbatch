@@ -29,18 +29,17 @@ public class FileReadCompletionListener extends JobExecutionListenerSupport {
 	@Override
 	public void afterJob(JobExecution jobExecution) {
 		if(jobExecution.getStatus() == BatchStatus.COMPLETED) {
-			log.info("============ JOB FINISHED ============ Verifying the results....\n");
+			log.debug("============ JOB FINISHED ============ Verifying the results....\n");
 
 			List<SourceContentDTO> results = jdbcTemplate.query("SELECT field1, field2, field3, processed FROM FIELDS", 
 					(ResultSet rs, int row) -> new SourceContentDTO(rs.getString(1), rs.getString(2), rs.getString(3), rs.getBoolean(4)));
 
-			results.forEach((x) -> log.info("Discovered <" + x + "> in the database."));
+			results.forEach((x) -> log.debug("Discovered <" + x + "> in the database."));
 		}
 		
-		System.out.println("Spring tables-->");
 		List<BatchStepInstance> results = jdbcTemplate.query("SELECT step_execution_id, job_execution_id, status, exit_code FROM BATCH_STEP_EXECUTION", 
 				(ResultSet rs, int row) -> new BatchStepInstance(rs.getLong(1), rs.getLong(2), rs.getString(3), rs.getString(4)));
-		results.forEach((x) -> log.info("Spring Batch <" + x + "> in the database."));
+		results.forEach((x) -> log.debug("Spring Batch <" + x + "> in the database."));
 	}
 	
 	public static class BatchStepInstance {
