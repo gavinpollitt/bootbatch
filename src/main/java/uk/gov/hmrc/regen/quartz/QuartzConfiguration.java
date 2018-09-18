@@ -1,7 +1,9 @@
 package uk.gov.hmrc.regen.quartz;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -19,6 +21,8 @@ import org.quartz.listeners.JobListenerSupport;
 import org.quartz.listeners.TriggerListenerSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.batch.core.ExitStatus;
+import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.configuration.JobLocator;
 import org.springframework.batch.core.configuration.JobRegistry;
 import org.springframework.batch.core.configuration.support.JobRegistryBeanPostProcessor;
@@ -30,6 +34,8 @@ import org.springframework.scheduling.quartz.CronTriggerFactoryBean;
 import org.springframework.scheduling.quartz.JobDetailFactoryBean;
 import org.springframework.scheduling.quartz.SchedulerFactoryBean;
 
+import uk.gov.hmrc.regen.common.ApplicationConfiguration;
+
 @Configuration
 public class QuartzConfiguration {
 
@@ -37,13 +43,35 @@ public class QuartzConfiguration {
 	
 	private static final String INPUT_FILE = "file:///home/regen/temp/fileinput/files/inputFile.csv";
 	private static final String PROCESSED_FILE = "file:///home/regen/temp/fileinput/files/process/inputFile.csv";
+	private static final String ERROR_DIR = "file:///home/regen/temp/fileinput/files/error/";
+	private static final Path ERROR_PATH;
+	private static final String ERROR_FILE = "file:///home/regen/temp/fileinput/files/error/inputFile.csv_error_";
 	private static final String OUTPUT_FILE = "file:///home/regen/temp/fileinput/files/output/outputFile";
 
+	static {
+		try {
+			ERROR_PATH = Paths.get(new URI(ERROR_DIR));
+		}
+		catch (Exception e) {
+			throw new RuntimeException(e.getMessage());
+		}
+	}
+	
+	@Autowired
+	ApplicationConfiguration config;
+	
 	@Autowired
 	private JobLauncher jobLauncher;
+	
 	@Autowired
 	private JobLocator jobLocator;
 
+	private static boolean isDirEmpty(final Path directory) throws IOException {
+	    try(DirectoryStream<Path> dirStream = Files.newDirectoryStream(directory)) {
+	        return !dirStream.iterator().hasNext();
+	    }
+	}
+	
 	@Bean
 	public JobRegistryBeanPostProcessor jobRegistryBeanPostProcessor(JobRegistry jobRegistry) {
 		JobRegistryBeanPostProcessor jobRegistryBeanPostProcessor = new JobRegistryBeanPostProcessor();
@@ -123,10 +151,11 @@ public class QuartzConfiguration {
 
 				if (context.getJobDetail().getKey().getName().equals("csv_job")) {
 					try {
-						veto = context.getScheduler().getCurrentlyExecutingJobs().size() > 0;
+						veto = context.getScheduler().getCurrentlyExecutingJobs().size() > 0 ||
+								!isDirEmpty(ERROR_PATH);
 
 						if (veto) {
-							this.getLog().info("Veto due to process already executing");
+							this.getLog().info("Veto due to process already executing or awaiting restart");
 						} else {
 							veto = !(new File(new URI(INPUT_FILE)).exists());
 							this.getLog().info("File existence check...Veto trigger " + veto);
@@ -163,7 +192,9 @@ public class QuartzConfiguration {
 			@Override
 			public void jobWasExecuted(JobExecutionContext context, JobExecutionException jobException) {
 				log.info("Job: " + context.getJobDetail().getKey().getName() + ", Exception: " + jobException + ", Status: " + context.getResult());
-				if (context.getJobDetail().getKey().getName().equals("csv_job") && jobException == null) {
+				JobExecution jEx = (JobExecution)context.getResult();
+				boolean repairRequired = (jEx != null) && (jEx.getExitStatus().equals(ExitStatus.FAILED));
+				if (context.getJobDetail().getKey().getName().equals("csv_job") && jobException == null && !repairRequired) {
 					this.getLog().info("Performing job wrap-up for csv processing");
 
 					try {
@@ -177,7 +208,21 @@ public class QuartzConfiguration {
 					} catch (Exception e) {
 						this.getLog().error(e.getMessage());
 					}
+				}
+				else if (context.getJobDetail().getKey().getName().equals("csv_job") && jobException == null && repairRequired) {
+					this.getLog().info("Performing error tidy up csv processing");
 
+					try {
+						SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmm");
+						String NO = ERROR_FILE + sdf.format(new Date());
+						Path dest = Files.move(Paths.get(new URI(PROCESSED_FILE)), Paths.get(new URI(NO)));
+
+						if (dest == null) {
+							throw new Exception("Unable to move file:" + PROCESSED_FILE + " to " + NO);
+						}
+					} catch (Exception e) {
+						this.getLog().error(e.getMessage());
+					}
 				}
 				else if (context.getJobDetail().getKey().getName().equals("db_job") && jobException == null) {
 					this.getLog().info("Performing job wrap-up for database processing");

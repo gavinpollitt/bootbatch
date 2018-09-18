@@ -34,7 +34,7 @@ public class RecordValidationListener implements ItemReadListener<SourceContentD
 		
 		StringBuffer buff = new StringBuffer();
 		if (!violations.isEmpty()) {
-			violations.forEach(v -> buff.append(v.getMessage()));
+			violations.forEach(v -> buff.append(v.getPropertyPath() + ":" + v.getInvalidValue() + "-->" + v.getMessage() + "\n"));
 			
 			log.error(buff.toString());
 			throw new ValidationException(buff.toString());

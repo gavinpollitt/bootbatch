@@ -1,0 +1,24 @@
+spring:
+   profiles: dev
+input:
+   inputFileName: inputFile.csv
+   inputFile: file:///home/regen/temp/fileinput/files/${input.inputFileName}
+   processedFile: file:///home/regen/temp/fileinput/files/process/${input.inputFileName}
+   errorDir: file:///home/regen/temp/fileinput/files/error/
+   errorFile: file:///home/regen/temp/fileinput/files/error/${input.inputFileName}_error_
+   outputFileName: outputFile
+   outputFile: file:///home/regen/temp/fileinput/files/output/${input.outputFileName}
+---
+spring:
+   profiles: prod
+input:
+   inputFileName: inputFile.csv
+   inputFile: file:///home/regen/temp/fileinput/files/${input.inputFileName}
+   processedFile: file:///home/regen/temp/fileinput/files/process/${input.inputFileName}
+   errorDir: file:///home/regen/temp/fileinput/files/error/
+   errorFile: file:///home/regen/temp/fileinput/files/error/${input.inputFileName}_error_
+   outputFileName: outputFile
+   outputFile: file:///home/regen/temp/fileinput/files/output/${input.outputFileName}
+
+
+
