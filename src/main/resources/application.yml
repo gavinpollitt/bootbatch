@@ -1,5 +1,10 @@
 spring:
    profiles: dev
+   datasource: 
+      url: jdbc:hsqldb:hsql://192.168.0.15/batch_db
+      username: batch
+      password: batch
+      driver-class-name: org.hsqldb.jdbcDriver
 input:
    inputFileName: inputFile.csv
    inputFile: file:///home/regen/temp/fileinput/files/${input.inputFileName}
@@ -7,10 +12,15 @@ input:
    errorDir: file:///home/regen/temp/fileinput/files/error/
    errorFile: file:///home/regen/temp/fileinput/files/error/${input.inputFileName}_error_
    outputFileName: outputFile
-   outputFile: file:///home/regen/temp/fileinput/files/output/${input.outputFileName}
+   outputFile: file:///home/regen/temp/fileinput/files/output/${input.outputFileName}  
 ---
 spring:
    profiles: prod
+   datasource: 
+      url: jdbc:hsqldb:hsql://192.168.0.15/batch_db
+      username: batch
+      password: batch
+      driver-class-name: org.hsqldb.jdbcDriver
 input:
    inputFileName: inputFile.csv
    inputFile: file:///home/regen/temp/fileinput/files/${input.inputFileName}
@@ -19,6 +29,4 @@ input:
    errorFile: file:///home/regen/temp/fileinput/files/error/${input.inputFileName}_error_
    outputFileName: outputFile
    outputFile: file:///home/regen/temp/fileinput/files/output/${input.outputFileName}
-
-
 
