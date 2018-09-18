@@ -41,22 +41,6 @@ public class QuartzConfiguration {
 
 	private static final Logger log = LoggerFactory.getLogger(QuartzConfiguration.class);
 	
-	private static final String INPUT_FILE = "file:///home/regen/temp/fileinput/files/inputFile.csv";
-	private static final String PROCESSED_FILE = "file:///home/regen/temp/fileinput/files/process/inputFile.csv";
-	private static final String ERROR_DIR = "file:///home/regen/temp/fileinput/files/error/";
-	private static final Path ERROR_PATH;
-	private static final String ERROR_FILE = "file:///home/regen/temp/fileinput/files/error/inputFile.csv_error_";
-	private static final String OUTPUT_FILE = "file:///home/regen/temp/fileinput/files/output/outputFile";
-
-	static {
-		try {
-			ERROR_PATH = Paths.get(new URI(ERROR_DIR));
-		}
-		catch (Exception e) {
-			throw new RuntimeException(e.getMessage());
-		}
-	}
-	
 	@Autowired
 	ApplicationConfiguration config;
 	
@@ -152,16 +136,16 @@ public class QuartzConfiguration {
 				if (context.getJobDetail().getKey().getName().equals("csv_job")) {
 					try {
 						veto = context.getScheduler().getCurrentlyExecutingJobs().size() > 0 ||
-								!isDirEmpty(ERROR_PATH);
+								!isDirEmpty(config.getERROR_PATH());
 
 						if (veto) {
 							this.getLog().info("Veto due to process already executing or awaiting restart");
 						} else {
-							veto = !(new File(new URI(INPUT_FILE)).exists());
+							veto = !(new File(new URI(config.getINPUT_FILE())).exists());
 							this.getLog().info("File existence check...Veto trigger " + veto);
 						}
 					} catch (Exception e) {
-						this.getLog().info("File " + INPUT_FILE + " not located...sleeping");
+						this.getLog().info("File " + config.getINPUT_FILE() + " not located...sleeping");
 						veto = true;
 					}
 				}
@@ -178,10 +162,10 @@ public class QuartzConfiguration {
 					this.getLog().info("Performing job set-up for csv processing");
 
 					try {
-						Path dest = Files.move(Paths.get(new URI(INPUT_FILE)), Paths.get(new URI(PROCESSED_FILE)));
+						Path dest = Files.move(Paths.get(new URI(config.getINPUT_FILE())), Paths.get(new URI(config.getPROCESSED_FILE())));
 
 						if (dest == null) {
-							throw new Exception("Unable to move file:" + INPUT_FILE + " to " + PROCESSED_FILE);
+							throw new Exception("Unable to move file:" + config.getINPUT_FILE() + " to " + config.getPROCESSED_FILE());
 						}
 					} catch (Exception e) {
 						this.getLog().error(e.getMessage());
@@ -199,11 +183,11 @@ public class QuartzConfiguration {
 
 					try {
 						SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmm");
-						String NO = PROCESSED_FILE + sdf.format(new Date());
-						Path dest = Files.move(Paths.get(new URI(PROCESSED_FILE)), Paths.get(new URI(NO)));
+						String NO = config.getPROCESSED_FILE() + sdf.format(new Date());
+						Path dest = Files.move(Paths.get(new URI(config.getPROCESSED_FILE())), Paths.get(new URI(NO)));
 
 						if (dest == null) {
-							throw new Exception("Unable to move file:" + PROCESSED_FILE + " to " + NO);
+							throw new Exception("Unable to move file:" + config.getPROCESSED_FILE() + " to " + NO);
 						}
 					} catch (Exception e) {
 						this.getLog().error(e.getMessage());
@@ -214,11 +198,11 @@ public class QuartzConfiguration {
 
 					try {
 						SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmm");
-						String NO = ERROR_FILE + sdf.format(new Date());
-						Path dest = Files.move(Paths.get(new URI(PROCESSED_FILE)), Paths.get(new URI(NO)));
+						String NO = config.getERROR_FILE() + sdf.format(new Date());
+						Path dest = Files.move(Paths.get(new URI(config.getPROCESSED_FILE())), Paths.get(new URI(NO)));
 
 						if (dest == null) {
-							throw new Exception("Unable to move file:" + PROCESSED_FILE + " to " + NO);
+							throw new Exception("Unable to move file:" + config.getPROCESSED_FILE() + " to " + NO);
 						}
 					} catch (Exception e) {
 						this.getLog().error(e.getMessage());
@@ -229,11 +213,11 @@ public class QuartzConfiguration {
 
 					try {
 						SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmm");
-						String NO = OUTPUT_FILE + sdf.format(new Date());
-						Path dest = Files.move(Paths.get(new URI(OUTPUT_FILE)), Paths.get(new URI(NO)));
+						String NO = config.getOUTPUT_FILE() + sdf.format(new Date());
+						Path dest = Files.move(Paths.get(new URI(config.getOUTPUT_FILE())), Paths.get(new URI(NO)));
 
 						if (dest == null) {
-							throw new Exception("Unable to move file:" + OUTPUT_FILE + " to " + NO);
+							throw new Exception("Unable to move file:" + config.getOUTPUT_FILE() + " to " + NO);
 						}
 					} catch (NoSuchFileException fnf) {
 						this.getLog().debug("No output file found to timestamp");
