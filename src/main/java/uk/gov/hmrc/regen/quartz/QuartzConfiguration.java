@@ -145,6 +145,7 @@ public class QuartzConfiguration {
 						}
 					} catch (Exception e) {
 						this.getLog().info("File " + config.getINPUT_FILE() + " not located...sleeping");
+						this.getLog().error("Error:" + e);
 						veto = true;
 					}
 				}

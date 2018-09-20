@@ -7,12 +7,28 @@ spring:
       driver-class-name: org.hsqldb.jdbcDriver
 input:
    inputFileName: inputFile.csv
-   inputFile: file:///home/regen/temp/fileinput/files/${input.inputFileName}
-   processedFile: file:///home/regen/temp/fileinput/files/process/${input.inputFileName}
-   errorDir: file:///home/regen/temp/fileinput/files/error/
-   errorFile: file:///home/regen/temp/fileinput/files/error/${input.inputFileName}_error_
+   inputFile: file:///home/runuser/files/${input.inputFileName}
+   processedFile: file:///home/runuser/files/process/${input.inputFileName}
+   errorDir: file:///home/runuser/files/error/
+   errorFile: file:///home/runuser/files/error/${input.inputFileName}_error_
    outputFileName: outputFile
-   outputFile: file:///home/regen/temp/fileinput/files/output/${input.outputFileName}  
+   outputFile: file:///home/runuser/files/output/${input.outputFileName}  
+---
+spring:
+   profiles: none_doc
+   datasource: 
+      url: jdbc:hsqldb:hsql://192.168.0.15/batch_db
+      username: batch
+      password: batch
+      driver-class-name: org.hsqldb.jdbcDriver
+input:
+   inputFileName: inputFile.csv
+   inputFile: file:///home/runuser/files/${input.inputFileName}
+   processedFile: file:///home/runuser/files/process/${input.inputFileName}
+   errorDir: file:///home/runuser/runuser/files/error/
+   errorFile: file:///home/runuser/runuser/files/error/${input.inputFileName}_error_
+   outputFileName: outputFile
+   outputFile: file:///home/runuser/files/output/${input.outputFileName}  
 ---
 spring:
    profiles: prod
