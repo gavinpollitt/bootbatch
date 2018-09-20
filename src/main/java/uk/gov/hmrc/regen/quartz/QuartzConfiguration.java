@@ -28,6 +28,7 @@ import org.springframework.batch.core.configuration.JobRegistry;
 import org.springframework.batch.core.configuration.support.JobRegistryBeanPostProcessor;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.quartz.CronTriggerFactoryBean;
@@ -78,9 +79,9 @@ public class QuartzConfiguration {
 	}
 
 	@Bean
-	public CronTriggerFactoryBean csvCronTriggerFactoryBean() {
+	public CronTriggerFactoryBean csvCronTriggerFactoryBean(@Qualifier("csvJobDetailFactoryBean") JobDetailFactoryBean factory) {
 		CronTriggerFactoryBean stFactory = new CronTriggerFactoryBean();
-		stFactory.setJobDetail(csvJobDetailFactoryBean().getObject());
+		stFactory.setJobDetail(factory.getObject());
 		stFactory.setStartDelay(3000);
 		stFactory.setName("csv_cron_trigger");
 		stFactory.setGroup("csv_group");
@@ -103,9 +104,9 @@ public class QuartzConfiguration {
 	}
 
 	@Bean
-	public CronTriggerFactoryBean dbCronTriggerFactoryBean() {
+	public CronTriggerFactoryBean dbCronTriggerFactoryBean(@Qualifier("dbJobDetailFactoryBean") JobDetailFactoryBean factory) {
 		CronTriggerFactoryBean stFactory = new CronTriggerFactoryBean();
-		stFactory.setJobDetail(dbJobDetailFactoryBean().getObject());
+		stFactory.setJobDetail(factory.getObject());
 		stFactory.setStartDelay(3000);
 		stFactory.setName("db_cron_trigger");
 		stFactory.setGroup("scv_group");
@@ -114,11 +115,13 @@ public class QuartzConfiguration {
 	}
 	
 	@Bean
-	public SchedulerFactoryBean schedulerFactoryBean() throws SchedulerException {
+	public SchedulerFactoryBean schedulerFactoryBean(
+							@Qualifier("csvCronTriggerFactoryBean") CronTriggerFactoryBean csvTrigger,
+							@Qualifier("dbCronTriggerFactoryBean") CronTriggerFactoryBean dbTrigger) throws SchedulerException {
 		log.info("Creating the scheduler");
 		SchedulerFactoryBean scheduler = new SchedulerFactoryBean();
-		scheduler.setTriggers(csvCronTriggerFactoryBean().getObject(),
-							  dbCronTriggerFactoryBean().getObject());
+		scheduler.setTriggers(csvTrigger.getObject(),
+							  dbTrigger.getObject());
 
 		scheduler.setGlobalTriggerListeners(new TriggerListenerSupport() {
 

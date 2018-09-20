@@ -17,6 +17,8 @@ import org.springframework.batch.core.configuration.annotation.JobBuilderFactory
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.item.ItemProcessor;
+import org.springframework.batch.item.ItemReader;
+import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider;
 import org.springframework.batch.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.item.file.FlatFileItemReader;
@@ -25,6 +27,7 @@ import org.springframework.batch.item.file.mapping.DefaultLineMapper;
 import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
 import org.springframework.batch.item.support.CompositeItemProcessor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.UrlResource;
@@ -118,22 +121,26 @@ public class CsvFileToDatabaseConfig {
 
 
 	@Bean
-	public Step csvFileToDatabaseStep() throws Exception {
+	public Step csvFileToDatabaseStep(
+			@Qualifier("csvFileReader") ItemReader<SourceContentDTO> reader,
+			@Qualifier("csvFileProcessor") ItemProcessor<SourceContentDTO,SourceContentDTO> processor,
+			@Qualifier("toDBWriter") ItemWriter<SourceContentDTO> writer) throws Exception {
 
 		return stepBuilderFactory.get("csvFileToDatabaseStep").allowStartIfComplete(true).
 				<SourceContentDTO, SourceContentDTO> chunk(5).
 				faultTolerant().noSkip(ValidationException.class).
-				reader(csvFileReader()).
-				processor(csvFileProcessor()).
-				writer(toDBWriter()).
+				reader(reader).
+				processor(processor).
+				writer(writer).
 				listener(validationListener).
 				build();
 	}
 
 	@Bean
-	Job csvFileToDatabaseJob(FileReadCompletionListener listener) throws Exception {
+	Job csvFileToDatabaseJob(@Qualifier("csvFileToDatabaseStep") Step step,
+										FileReadCompletionListener listener) throws Exception {
 		return jobBuilderFactory.get("csvFileToDatabaseJob").incrementer(new RunIdIncrementer()).listener(listener)
-				.flow(csvFileToDatabaseStep()).end().build();
+				.flow(step).end().build();
 	}
 	// end job info
 }

@@ -28,6 +28,7 @@ import org.springframework.batch.item.file.transform.FormatterLineAggregator;
 import org.springframework.batch.item.file.transform.LineAggregator;
 import org.springframework.batch.item.support.CompositeItemWriter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
@@ -117,19 +118,22 @@ public class DatabaseToFileConfig {
 	}
 	
 
-	// begin job info
 	@Bean
-	public Step datatabaseToFileStep(DBReadStepCompletionListener listener) throws Exception {
+	public Step datatabaseToFileStep(			
+			@Qualifier("dbItemReader") ItemReader<SourceContentDTO> reader,
+			@Qualifier("dbContentProcessor") ItemProcessor<SourceContentDTO,SourceContentDTO> processor,
+			@Qualifier("outputWriter") ItemWriter<SourceContentDTO> writer,
+			DBReadStepCompletionListener listener) throws Exception {
 
 		return stepBuilderFactory.get("datatabaseToFileStep").allowStartIfComplete(true)
-				.<SourceContentDTO, SourceContentDTO> chunk(5).reader(dbItemReader()).processor(dbContentProcessor())
-				.writer(outputWriter()).listener(listener).build();
+				.<SourceContentDTO, SourceContentDTO> chunk(5).reader(reader).processor(processor)
+				.writer(writer).listener(listener).build();
 	}
 
 	@Bean
-	Job databaseToFileJob(DBReadStepCompletionListener listener) throws Exception {
+	Job databaseToFileJob(@Qualifier("datatabaseToFileStep") Step step,
+			DBReadStepCompletionListener listener) throws Exception {
 		return jobBuilderFactory.get("databaseToFileJob").incrementer(new RunIdIncrementer())
-				.flow(datatabaseToFileStep(listener)).end().build();
+				.flow(step).end().build();
 	}
-	// end job info
 }
