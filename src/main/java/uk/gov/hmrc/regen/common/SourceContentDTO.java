@@ -5,6 +5,12 @@ import javax.validation.constraints.Size;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
+/**
+ * 
+ * @author gp
+ * Uses hibernate validator library to incorporate field checking on the input data.
+ *
+ */
 public class SourceContentDTO {
 
 	@Size(min = 3, max = 30)

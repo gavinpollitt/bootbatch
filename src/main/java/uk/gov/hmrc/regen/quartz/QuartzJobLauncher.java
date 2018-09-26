@@ -12,6 +12,12 @@ import org.springframework.batch.core.configuration.JobLocator;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.scheduling.quartz.QuartzJobBean;
 
+/**
+ * 
+ * @author gp
+ *
+ * Class to provide the bridge between Quartz and Spring Batch.
+ */
 public class QuartzJobLauncher extends QuartzJobBean {
 
 	private static final Logger log = LoggerFactory.getLogger(QuartzJobLauncher.class);
@@ -44,6 +50,7 @@ public class QuartzJobLauncher extends QuartzJobBean {
 		this.jobLocator = jobLocator;
 	}
 
+	// Actually run the Spring batch job.
 	@Override
 	protected void executeInternal(JobExecutionContext context) throws JobExecutionException {
 		try {

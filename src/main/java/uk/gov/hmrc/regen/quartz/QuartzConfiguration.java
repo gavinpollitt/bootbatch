@@ -37,6 +37,12 @@ import org.springframework.scheduling.quartz.SchedulerFactoryBean;
 
 import uk.gov.hmrc.regen.common.ApplicationConfiguration;
 
+/**
+ * 
+ * @author gp
+ *
+ * Configure the Quartz wrapper to enable self-scheduling of the batch job.
+ */
 @Configuration
 public class QuartzConfiguration {
 
@@ -45,18 +51,26 @@ public class QuartzConfiguration {
 	@Autowired
 	ApplicationConfiguration config;
 	
+	// Inject the launcher to allow the Spring Batch jobs to be instantiated
 	@Autowired
 	private JobLauncher jobLauncher;
 	
+	// Inject the locator to allow the retrieval of the Spring Batch information
 	@Autowired
 	private JobLocator jobLocator;
 
+	/*
+	 * Utility method to check if directory is empty.
+	 */
 	private static boolean isDirEmpty(final Path directory) throws IOException {
 	    try(DirectoryStream<Path> dirStream = Files.newDirectoryStream(directory)) {
 	        return !dirStream.iterator().hasNext();
 	    }
 	}
 	
+	/*
+	 * Register the jobRegistry with an appropriate post-processor bean.
+	 */
 	@Bean
 	public JobRegistryBeanPostProcessor jobRegistryBeanPostProcessor(JobRegistry jobRegistry) {
 		JobRegistryBeanPostProcessor jobRegistryBeanPostProcessor = new JobRegistryBeanPostProcessor();
@@ -64,6 +78,10 @@ public class QuartzConfiguration {
 		return jobRegistryBeanPostProcessor;
 	}
 
+	/*
+	 * Register the Spring Batch job to read the CSV file with Quartz. Use the QuartzJobLauncher to provide the
+	 * facility to launch the Spring Batch jobs.
+	 */
 	@Bean
 	public JobDetailFactoryBean csvJobDetailFactoryBean() {
 		JobDetailFactoryBean factory = new JobDetailFactoryBean();
@@ -78,6 +96,9 @@ public class QuartzConfiguration {
 		return factory;
 	}
 
+	/*
+	 * Register the trigger to instantiate the csv reader job according to the Cron settings
+	 */
 	@Bean
 	public CronTriggerFactoryBean csvCronTriggerFactoryBean(@Qualifier("csvJobDetailFactoryBean") JobDetailFactoryBean factory) {
 		CronTriggerFactoryBean stFactory = new CronTriggerFactoryBean();
@@ -89,6 +110,10 @@ public class QuartzConfiguration {
 		return stFactory;
 	}
 
+	/*
+	 * Register the Spring Batch job to produce the output file with Quartz. Use the QuartzJobLauncher to provide the
+	 * facility to launch the Spring Batch jobs.
+	 */
 	@Bean
 	public JobDetailFactoryBean dbJobDetailFactoryBean() {
 		JobDetailFactoryBean factory = new JobDetailFactoryBean();
@@ -103,6 +128,9 @@ public class QuartzConfiguration {
 		return factory;
 	}
 
+	/*
+	 * Register the trigger to instantiate the output file writer job according to the Cron settings
+	 */
 	@Bean
 	public CronTriggerFactoryBean dbCronTriggerFactoryBean(@Qualifier("dbJobDetailFactoryBean") JobDetailFactoryBean factory) {
 		CronTriggerFactoryBean stFactory = new CronTriggerFactoryBean();
@@ -114,6 +142,9 @@ public class QuartzConfiguration {
 		return stFactory;
 	}
 	
+	/*
+	 * Create the actual instance of the Quartz scheduler to co-ordinate the whole process via the triggers set above.
+	 */
 	@Bean
 	public SchedulerFactoryBean schedulerFactoryBean(
 							@Qualifier("csvCronTriggerFactoryBean") CronTriggerFactoryBean csvTrigger,
@@ -123,6 +154,7 @@ public class QuartzConfiguration {
 		scheduler.setTriggers(csvTrigger.getObject(),
 							  dbTrigger.getObject());
 
+		//Provide rules to customise trigger behaviour according to the job being executed.
 		scheduler.setGlobalTriggerListeners(new TriggerListenerSupport() {
 
 			@Override
@@ -130,6 +162,7 @@ public class QuartzConfiguration {
 				return "VetoNoFileListener";
 			}
 
+			// Don't bother executing Spring Batch if a file isn't available to process.
 			@Override
 			public boolean vetoJobExecution(Trigger trigger, JobExecutionContext context) {
 
@@ -157,6 +190,7 @@ public class QuartzConfiguration {
 
 		});
 
+		// Move and tidy files depending on the results of the Spring Batch execution.
 		scheduler.setGlobalJobListeners(new JobListenerSupport() {
 
 			@Override

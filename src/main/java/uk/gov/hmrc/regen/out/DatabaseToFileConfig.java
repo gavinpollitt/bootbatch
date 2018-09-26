@@ -7,8 +7,6 @@ import java.util.List;
 
 import javax.sql.DataSource;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
@@ -37,23 +35,35 @@ import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import uk.gov.hmrc.regen.common.ApplicationConfiguration;
 import uk.gov.hmrc.regen.common.SourceContentDTO;
 
+/**
+ * 
+ * @author GP
+ *
+ * Construct Job to produce the output file and update the database accordingly
+ */
 @EnableBatchProcessing
 @Configuration
 public class DatabaseToFileConfig {
-	private static final Logger log = LoggerFactory.getLogger(DatabaseToFileConfig.class);
-
 	@Autowired
 	ApplicationConfiguration config;
 
+	// Bean created automatically through Spring Batch libraries on the classpath.
 	@Autowired
-	public JobBuilderFactory jobBuilderFactory;
+	private JobBuilderFactory jobBuilderFactory;
 
+	// Bean created automatically through Spring Batch libraries on the classpath.
 	@Autowired
-	public StepBuilderFactory stepBuilderFactory;
+	private StepBuilderFactory stepBuilderFactory;
 
+	// 'spring.datasource' properties on the classpath, used to create the dataSource bean
 	@Autowired
-	public DataSource dataSource;
+	private DataSource dataSource;
+	
 
+	/*
+	 * The Spring Batch ItemReader for the step. This Spring batch extension is 'tuned' for the 
+	 * reading of database tables.
+	 */
 	@Bean
 	ItemReader<SourceContentDTO> dbItemReader() {
 		JdbcCursorItemReader<SourceContentDTO> databaseReader = new JdbcCursorItemReader<>();
@@ -65,17 +75,28 @@ public class DatabaseToFileConfig {
 		return databaseReader;
 	}
 
+	/*
+	 * The Spring Batch ItemProcessor for the step. Nothing needs to be done with the data
+	 * in this case apart from return what was provided.
+	 */
 	@Bean
 	ItemProcessor<SourceContentDTO, SourceContentDTO> dbContentProcessor() {
 		return (dbContentDTO) -> dbContentDTO;
 	}
 
+	/*
+	 * Returns an FieldExtractor instance that will take a bean object and extract the actual
+	 * values into a collection
+	 */
 	private FieldExtractor<SourceContentDTO> createSourceFieldExtractor() {
 		BeanWrapperFieldExtractor<SourceContentDTO> extractor = new BeanWrapperFieldExtractor<>();
 		extractor.setNames(new String[] { "field1", "field2", "field3" });
 		return extractor;
 	}
 
+	/*
+	 * Utilising the extractor create an output based on the extractor values and the format provided.
+	 */
 	private LineAggregator<SourceContentDTO> createSourceLineAggregator() {
 		FormatterLineAggregator<SourceContentDTO> lineAggregator = new FormatterLineAggregator<>();
 
@@ -86,8 +107,13 @@ public class DatabaseToFileConfig {
 		return lineAggregator;
 	}
 
+	
+	/*
+	 * One of the Spring Batch ItemWriters for the step. This one is responsible for producing the file output
+	 * utilising the aggregator output. Will only produce a file if at least one record is present within it.
+	 */
 	@Bean
-	ItemWriter<SourceContentDTO> fileItemWriter() throws Exception {
+	public ItemWriter<SourceContentDTO> fileItemWriter() throws Exception {
 		FlatFileItemWriter<SourceContentDTO> outputFileWriter = new FlatFileItemWriter<>();
 
 		outputFileWriter.setResource(new FileSystemResource(new File(new URI(config.getOUTPUT_FILE()))));
@@ -99,14 +125,22 @@ public class DatabaseToFileConfig {
 		return outputFileWriter;
 	}
 
+	/*
+	 * One of the Spring Batch ItemWriters for the step. This one is responsible for updating the database record
+	 * when it has been 'pushed' to the output file.
+	 */
 	@Bean
-	public JdbcBatchItemWriter<SourceContentDTO> updateDBWriter() {
+	public ItemWriter<SourceContentDTO> updateDBWriter() {
 		JdbcBatchItemWriter<SourceContentDTO> toDBWriter = new JdbcBatchItemWriter<SourceContentDTO>();
 		toDBWriter.setItemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<SourceContentDTO>());
 		toDBWriter.setSql("UPDATE fields SET processed = true WHERE field1 = :field1");
 		toDBWriter.setDataSource(dataSource);
 		return toDBWriter;
 	}
+	
+	/*
+	 * The 'wrapper' writer for the two writers defined above.
+	 */
 	@Bean
 	ItemWriter<SourceContentDTO> outputWriter() throws Exception {
 		CompositeItemWriter<SourceContentDTO> writer = new CompositeItemWriter<>();
@@ -118,6 +152,11 @@ public class DatabaseToFileConfig {
 	}
 	
 
+	/*
+	 * The actual step to be processed by the Job. Is an aggregation of the reader, processor and writer, as
+	 * defined above, and these are injected as parameters.
+	 * The step is chunked to allow volume commits/rollbacks.
+	 */
 	@Bean
 	public Step datatabaseToFileStep(			
 			@Qualifier("dbItemReader") ItemReader<SourceContentDTO> reader,
@@ -130,6 +169,10 @@ public class DatabaseToFileConfig {
 				.writer(writer).listener(listener).build();
 	}
 
+	/*
+	 * The driving job, which executes the step, by default will be a re-startable job. Therefore, if a 
+	 * non-completed instance is found, the previously failed job will try to run to completion.
+	 */
 	@Bean
 	Job databaseToFileJob(@Qualifier("datatabaseToFileStep") Step step,
 			DBReadStepCompletionListener listener) throws Exception {

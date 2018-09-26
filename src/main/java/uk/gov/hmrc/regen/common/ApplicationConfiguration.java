@@ -7,6 +7,14 @@ import java.nio.file.Paths;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * 
+ * @author gp
+ * Set up the application properties from the appropriate YAML profile
+ * Could have used the annotation @ConfigurationProperties; however, this requires
+ * setters and could inadvertently result in the properties being corrupted externally.
+ *
+ */
 @Configuration
 public class ApplicationConfiguration {
 	@Value("${input.inputFile}")

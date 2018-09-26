@@ -44,25 +44,33 @@ public class CsvFileToDatabaseConfig {
 	@Autowired
 	ApplicationConfiguration config;
 
+	// Bean created automatically through Spring Batch libraries on the classpath.
 	@Autowired
 	private JobBuilderFactory jobBuilderFactory;
 
+	// Bean created automatically through Spring Batch libraries on the classpath.
 	@Autowired
 	private StepBuilderFactory stepBuilderFactory;
 
+	// 'spring.datasource' properties on the classpath, used to create the dataSource bean
 	@Autowired
 	private DataSource dataSource;
 	
 	@Autowired 
 	private RecordValidationListener validationListener;
 
+	/*
+	 * The Spring Batch ItemReader for the step. This Spring batch extension is 'tuned' for the 
+	 * reading of flat files.
+	 */
 	@Bean
-	public FlatFileItemReader<SourceContentDTO> csvFileReader() throws MalformedURLException {
+	public ItemReader<SourceContentDTO> csvFileReader() throws MalformedURLException {
 		FlatFileItemReader<SourceContentDTO> reader = new FlatFileItemReader<SourceContentDTO>();
 		reader.setStrict(false); // Don't fail if file not there
 
 		reader.setResource(new UrlResource(config.getPROCESSED_FILE()));
 
+		// Use the SpringBatch DefaultLineMapper with default command field delimeter
 		reader.setLineMapper(new DefaultLineMapper<SourceContentDTO>() {
 			{
 				setLineTokenizer(new DelimitedLineTokenizer() {
@@ -81,11 +89,18 @@ public class CsvFileToDatabaseConfig {
 	}
 
 	
+	/*
+	 * Bean to expose the underlying validation framework (JSR352 implementation) - in our case - Hibernate.
+	 */
     @Bean
     public Validator validatorFactory () {
         return new LocalValidatorFactoryBean();
     }
     
+	/*
+	 * The Spring Batch ItemProcessor for the step. The function to process the content simply
+	 * adds extra text to each field.
+	 */
 	@Bean
 	ItemProcessor<SourceContentDTO, SourceContentDTO> csvFileProcessor() {
 		return (fileContentDTO) -> {
@@ -101,6 +116,10 @@ public class CsvFileToDatabaseConfig {
 		};
 	}
 	
+	/*
+	 * The Spring Batch ItemProcessor for the step that bundles together all the other processors. In this case, it's
+	 * just one, but kept in just in case others are required in the future
+	 */
 	@Bean
 	ItemProcessor<SourceContentDTO, SourceContentDTO> inputProcessor() {
 		CompositeItemProcessor<SourceContentDTO, SourceContentDTO> processor = new CompositeItemProcessor<>();
@@ -110,8 +129,11 @@ public class CsvFileToDatabaseConfig {
 		return processor;
 	}
 
+	/*
+	 * The Spring Batch ItemWriter for the step. This uploads the data read from the file into the database tables.
+	 */
 	@Bean
-	public JdbcBatchItemWriter<SourceContentDTO> toDBWriter() {
+	public ItemWriter<SourceContentDTO> toDBWriter() {
 		JdbcBatchItemWriter<SourceContentDTO> toDBWriter = new JdbcBatchItemWriter<SourceContentDTO>();
 		toDBWriter.setItemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<SourceContentDTO>());
 		toDBWriter.setSql("INSERT INTO FIELDS (field1, field2, field3, processed) VALUES (:field1, :field2, :field3, false)");
@@ -120,6 +142,12 @@ public class CsvFileToDatabaseConfig {
 	}
 
 
+	/*
+	 * The actual step to be processed by the Job. Is an aggregation of the reader, processor and writer, as
+	 * defined above, and these are injected as parameters.
+	 * The step is chunked to allow volume commits/rollbacks and is made fault tolerant to allow failure where
+	 * data validation occurs.
+	 */
 	@Bean
 	public Step csvFileToDatabaseStep(
 			@Qualifier("csvFileReader") ItemReader<SourceContentDTO> reader,
@@ -136,11 +164,14 @@ public class CsvFileToDatabaseConfig {
 				build();
 	}
 
+	/*
+	 * The driving job, which executes the step, by default will be a re-startable job. Therefore, if a 
+	 * non-completed instance is found, the previously failed job will try to run to completion.
+	 */
 	@Bean
 	Job csvFileToDatabaseJob(@Qualifier("csvFileToDatabaseStep") Step step,
 										FileReadCompletionListener listener) throws Exception {
 		return jobBuilderFactory.get("csvFileToDatabaseJob").incrementer(new RunIdIncrementer()).listener(listener)
 				.flow(step).end().build();
 	}
-	// end job info
 }

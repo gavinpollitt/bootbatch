@@ -14,6 +14,14 @@ import org.springframework.stereotype.Component;
 
 import uk.gov.hmrc.regen.common.SourceContentDTO;
 
+/**
+ * 
+ * @author gp
+ * 
+ * Triggers the hibernate validation annotations on the content DTO. Will throw a ValidationException which
+ * will be intercepted by the job and terminate the job.
+ *
+ */
 @Component
 public class RecordValidationListener implements ItemReadListener<SourceContentDTO> {
 
@@ -26,6 +34,13 @@ public class RecordValidationListener implements ItemReadListener<SourceContentD
 	public void beforeRead() {
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * @see org.springframework.batch.core.ItemReadListener#afterRead(java.lang.Object)
+	 * When a line has been read, ensure it is valid. If not, extract the issues and report
+	 * the exception
+	 * 
+	 */
 	@Override
 	public void afterRead(SourceContentDTO item) {
 		log.debug("Validating " + item);

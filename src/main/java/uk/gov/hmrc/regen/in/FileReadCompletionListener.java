@@ -14,6 +14,13 @@ import org.springframework.stereotype.Component;
 
 import uk.gov.hmrc.regen.common.SourceContentDTO;
 
+/**
+ * 
+ * @author gp
+ *
+ * This is purely for info purposes to demonstrate the state of the data on completion of the CSV file read
+ * job.
+ */
 @Component
 public class FileReadCompletionListener extends JobExecutionListenerSupport {
 
